@@ -1,6 +1,7 @@
 # Data
 data/raw/
 data/processed/
+tata_1mg_Medicine_data.csv
 
 # Model artifacts
 models/*.pkl
@@ -14,6 +15,7 @@ mlruns/
 # Python
 __pycache__/
 *.pyc
+*.pyo
 .pytest_cache/
 
 # Jupyter
@@ -22,5 +24,3 @@ __pycache__/
 # Environment
 .env
 *.egg-info/
-dist/
-build/
