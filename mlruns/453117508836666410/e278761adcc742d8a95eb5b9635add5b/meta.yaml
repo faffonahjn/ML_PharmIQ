@@ -1,0 +1,14 @@
+artifact_uri: file:///C:/Users/faffo/Project/ML_PharmIQ/mlruns/453117508836666410/e278761adcc742d8a95eb5b9635add5b/artifacts
+end_time: 1776820173489
+entry_point_name: ''
+experiment_id: '453117508836666410'
+lifecycle_stage: active
+run_id: e278761adcc742d8a95eb5b9635add5b
+run_name: xgb_price_tier_v1
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1776820145581
+status: 3
+tags: []
+user_id: faffo

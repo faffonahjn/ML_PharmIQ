@@ -1,0 +1,26 @@
+# Data
+data/raw/
+data/processed/
+
+# Model artifacts
+models/*.pkl
+
+# Logs
+logs/
+
+# MLflow
+mlruns/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment
+.env
+*.egg-info/
+dist/
+build/

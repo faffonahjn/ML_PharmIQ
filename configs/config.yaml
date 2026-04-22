@@ -1,0 +1,52 @@
+project:
+  name: PharmIQ
+  version: '1.0'
+  system: price_tier_classifier
+data:
+  raw_path: tata_1mg_Medicine_data.csv
+  processed_path: data/processed/features.parquet
+target:
+  column: Price_Tier
+  classes:
+  - Budget
+  - Mid
+  - Premium
+  - Luxury
+  thresholds:
+  - 0.25
+  - 0.5
+  - 0.75
+features:
+  numeric:
+  - unit_price
+  - salt_count
+  - pack_size_units
+  categorical:
+  - dosage_form
+  - manufacturer_tier
+  text:
+  - Salt_Composition
+model:
+  name: xgboost_price_tier
+  path: models/price_tier_classifier_v1.pkl
+  params:
+    n_estimators: 499
+    max_depth: 8
+    learning_rate: 0.138068
+    subsample: 0.7335
+    colsample_bytree: 0.6131
+    use_label_encoder: false
+    eval_metric: mlogloss
+    random_state: 42
+    min_child_weight: 6
+training:
+  test_size: 0.2
+  val_size: 0.1
+  random_state: 42
+  cv_folds: 5
+serving:
+  host: 0.0.0.0
+  port: 8000
+  api_version: v1
+thresholds:
+  target_auc_ovr: 0.88

@@ -1,0 +1,5 @@
+{
+  "test_accuracy": 0.6449,
+  "auc_ovr_macro": 0.8701,
+  "auc_ovo_macro": 0.8701
+}

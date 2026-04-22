@@ -1,0 +1,10 @@
+artifact_location: file:///C:/Users/faffo/Project/ML_PharmIQ/mlruns/453117508836666410/models/m-20995a21a4454a7e849bdc677cc97724/artifacts
+creation_timestamp: 1776820169905
+experiment_id: '453117508836666410'
+last_updated_timestamp: 1776820173444
+model_id: m-20995a21a4454a7e849bdc677cc97724
+model_type: null
+name: model
+source_run_id: e278761adcc742d8a95eb5b9635add5b
+status: 2
+status_message: null
