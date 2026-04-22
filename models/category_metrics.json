@@ -1,0 +1,5 @@
+{
+  "test_accuracy": 0.9601,
+  "auc_ovr_macro": 0.999,
+  "n_classes": 13
+}

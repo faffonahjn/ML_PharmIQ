@@ -111,7 +111,10 @@ with st.sidebar:
 st.markdown('<p class="main-title">💊 PharmIQ</p>', unsafe_allow_html=True)
 st.markdown('<p class="sub-title">Medicine Price Tier Intelligence — Formulation-based classification across 273K+ Indian medicines</p>', unsafe_allow_html=True)
 
-tab1, tab2, tab3 = st.tabs(["🔍 Predict", "📊 Batch Analysis", "📈 Model Insights"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "🔍 Price Predict", "💊 Generic Finder",
+    "🏷️ Category Classifier", "📊 Batch Analysis", "📈 Model Insights"
+])
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TAB 1: Single Prediction
@@ -216,9 +219,305 @@ with tab1:
             """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
-# TAB 2: Batch Analysis
+# TAB 2: Generic Alternative Finder
 # ─────────────────────────────────────────────────────────────────────────────
 with tab2:
+    st.markdown("### 💊 Generic Alternative Finder")
+    st.markdown("Find cheaper medicines with the **same active ingredient(s)** from across 273K+ Indian pharmaceutical products.")
+
+    @st.cache_resource
+    def load_recommender():
+        import pickle
+        import sys
+        sys.path.insert(0, str(PROJECT_ROOT))
+        from src.recommender.engine import GenericRecommender
+        idx_path = PROJECT_ROOT / "models" / "recommender_index.pkl"
+        with open(idx_path, "rb") as f:
+            index = pickle.load(f)
+        return GenericRecommender(index)
+
+    try:
+        rec_engine = load_recommender()
+        rec_loaded = True
+    except Exception as e:
+        rec_engine = None
+        rec_loaded = False
+        st.error(f"Recommender index not found: {e}")
+
+    # ── Search mode toggle
+    search_mode = st.radio(
+        "Search by", ["Medicine Name", "Salt Composition"],
+        horizontal=True,
+        help="Name search resolves to salt composition automatically.",
+    )
+
+    col_inp, col_opts = st.columns([2, 1])
+
+    with col_inp:
+        if search_mode == "Medicine Name":
+            query_input = st.text_input(
+                "Medicine Name",
+                value="Azithral 500 Tablet",
+                placeholder="e.g. Crocin 500 Tablet, Pan 40 Tablet",
+            )
+        else:
+            query_input = st.text_input(
+                "Salt Composition",
+                value="Azithromycin (500mg)",
+                placeholder="e.g. Paracetamol (500mg) + Ibuprofen (400mg)",
+            )
+            query_mrp = st.number_input("Your medicine's MRP (₹)", min_value=0.0, value=0.0, step=5.0,
+                                         help="Used to calculate savings %. Leave 0 if unknown.")
+
+    with col_opts:
+        match_mode = st.selectbox(
+            "Match Mode",
+            options=["exact", "ingredient"],
+            format_func=lambda x: {
+                "exact": "Exact (same dose)",
+                "ingredient": "Ingredient (any dose)",
+            }[x],
+            help="Exact: same salt + same dose. Ingredient: same drug, any dose.",
+        )
+        top_n = st.slider("Results", min_value=5, max_value=30, value=10, step=5)
+
+    search_btn = st.button("Find Alternatives", type="primary", use_container_width=True)
+
+    if search_btn:
+        if not rec_loaded:
+            st.error("Recommender index not loaded.")
+        else:
+            with st.spinner("Searching 273K medicines..."):
+                try:
+                    if search_mode == "Medicine Name":
+                        result = rec_engine.search_by_name(
+                            medicine_name=query_input,
+                            top_n=top_n,
+                            mode=match_mode,
+                        )
+                    else:
+                        result = rec_engine.recommend_by_salt(
+                            salt_composition=query_input,
+                            query_name="",
+                            query_mrp=query_mrp if "query_mrp" in dir() else 0.0,
+                            top_n=top_n,
+                            mode=match_mode,
+                        )
+                except Exception as e:
+                    st.error(f"Recommendation error: {e}")
+                    result = None
+
+            if result:
+                if not result.alternatives:
+                    st.warning(result.message)
+                else:
+                    # ── Query summary
+                    st.divider()
+                    qcol1, qcol2, qcol3, qcol4 = st.columns(4)
+                    qcol1.metric("Query Medicine", result.query_name)
+                    qcol2.metric("Salt Composition", result.query_salt_composition[:40] + ("..." if len(result.query_salt_composition) > 40 else ""))
+                    qcol3.metric("Total Alternatives Found", f"{result.total_found:,}")
+                    qcol4.metric("Best Savings", f"{result.cheapest_savings_pct:.1f}%", delta=f"{result.cheapest_savings_pct:.1f}% cheaper/unit")
+
+                    st.markdown(f"**{result.message}** | Match mode: `{result.mode}`")
+                    st.divider()
+
+                    # ── Results table
+                    rows = []
+                    for i, alt in enumerate(result.alternatives, 1):
+                        savings_color = "🟢" if alt.unit_price_savings_pct > 50 else ("🟡" if alt.unit_price_savings_pct > 0 else "🔴")
+                        rows.append({
+                            "Rank": i,
+                            "Medicine": alt.name,
+                            "Salt": alt.salt_composition[:50] + ("..." if len(alt.salt_composition) > 50 else ""),
+                            "Pack": alt.quantity,
+                            "MRP (₹)": f"₹{alt.mrp:.2f}",
+                            "Unit Price (₹)": f"₹{alt.unit_price:.3f}",
+                            "Savings/Unit": f"{savings_color} {alt.unit_price_savings_pct:.1f}%",
+                            "Manufacturer": alt.manufacturer[:30],
+                            "Tier": alt.manufacturer_tier_label,
+                        })
+
+                    df_results = pd.DataFrame(rows)
+                    st.dataframe(df_results, use_container_width=True, hide_index=True)
+
+                    # ── Savings bar chart
+                    if len(result.alternatives) > 1:
+                        fig = go.Figure()
+                        names = [a.name[:25] for a in result.alternatives]
+                        savings = [a.unit_price_savings_pct for a in result.alternatives]
+                        colors_bar = ["#2ECC71" if s > 50 else "#F39C12" if s > 0 else "#E74C3C" for s in savings]
+                        fig.add_trace(go.Bar(
+                            x=names, y=savings,
+                            marker_color=colors_bar,
+                            text=[f"{s:.1f}%" for s in savings],
+                            textposition="outside",
+                        ))
+                        fig.update_layout(
+                            title="Unit Price Savings vs Query Medicine (%)",
+                            yaxis_title="Savings (%)",
+                            height=350,
+                            margin=dict(t=40, b=80, l=20, r=20),
+                            plot_bgcolor="white",
+                            showlegend=False,
+                        )
+                        fig.update_xaxes(tickangle=-35)
+                        fig.update_yaxes(showgrid=True, gridcolor="#f0f0f0")
+                        st.plotly_chart(fig, use_container_width=True)
+
+                    # ── Download
+                    csv_out = df_results.to_csv(index=False)
+                    st.download_button(
+                        "Download Results CSV",
+                        csv_out,
+                        f"pharmiq_alternatives_{query_input[:20].replace(' ','_')}.csv",
+                        "text/csv",
+                    )
+    else:
+        st.markdown("""
+        <div style="text-align:center; color:#aaa; padding:2.5rem 0;">
+            <div style="font-size:3rem;">🔍</div>
+            <div>Enter a medicine name or salt composition and click Find Alternatives</div>
+            <div style="margin-top:0.5rem; font-size:0.9rem;">Example: <code>Azithral 500 Tablet</code> → finds 1,902 cheaper alternatives, best saving 95.9%</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TAB 3: Therapeutic Category Classifier
+# ─────────────────────────────────────────────────────────────────────────────
+with tab3:
+    st.markdown("### 🏷️ Therapeutic Category Classifier")
+    st.markdown("Classify a medicine's therapeutic category from its salt composition — 13 categories, **AUC 0.999**, accuracy 96%.")
+
+    @st.cache_resource
+    def load_category_model():
+        import joblib
+        return joblib.load(PROJECT_ROOT / "models" / "category_classifier_v1.pkl")
+
+    @st.cache_resource
+    def get_label_engine():
+        from src.classifier.label_engine import assign_label, PRIORITY_ORDER, CODE_TO_CATEGORY
+        return assign_label, PRIORITY_ORDER, CODE_TO_CATEGORY
+
+    try:
+        cat_model = load_category_model()
+        assign_label_fn, CATS, CODE_MAP = get_label_engine()
+        cat_loaded = True
+    except Exception as e:
+        cat_model = None
+        cat_loaded = False
+        st.error(f"Category model not found: {e}")
+
+    CAT_COLORS = {
+        "Antibiotic": "#E74C3C", "Analgesic": "#E67E22", "Anti-diabetic": "#27AE60",
+        "Cardiac": "#C0392B", "Respiratory": "#2980B9", "Gastrointestinal": "#8E44AD",
+        "Neurological": "#2C3E50", "Vitamin/Supplement": "#F1C40F", "Hormonal": "#E91E63",
+        "Dermatology": "#FF5722", "Musculoskeletal": "#795548", "Anti-parasitic": "#009688",
+        "Ophthalmic": "#3F51B5", "Other": "#95A5A6",
+    }
+
+    col_left, col_right = st.columns([1, 1], gap="large")
+
+    with col_left:
+        st.markdown("#### Input")
+        cat_salt = st.text_area(
+            "Salt Composition",
+            value="Azithromycin (500mg)",
+            height=100,
+            help="e.g. Metformin (500mg) + Glimepiride (1mg)",
+        )
+        cat_quantity = st.text_input(
+            "Quantity / Pack",
+            value="strip of 10 tablets",
+            help="Used to extract dosage form",
+        )
+        classify_btn = st.button("Classify", type="primary", use_container_width=True)
+
+    with col_right:
+        st.markdown("#### Result")
+
+        if classify_btn:
+            if not cat_loaded:
+                st.error("Model not loaded.")
+            else:
+                from src.features.engineer import extract_dosage_form, extract_salt_count
+
+                dosage_form = extract_dosage_form(cat_quantity)
+                salt_count = extract_salt_count(cat_salt)
+                features_df = pd.DataFrame([{
+                    "Salt_Composition": cat_salt,
+                    "dosage_form": dosage_form,
+                    "salt_count": salt_count,
+                }])
+
+                pred_code = int(cat_model.predict(features_df)[0])
+                proba = cat_model.predict_proba(features_df)[0]
+                classes = cat_model.classes_
+                pred_category = CODE_MAP.get(pred_code, "Other")
+                rule_label = assign_label_fn(cat_salt)
+                color = CAT_COLORS.get(pred_category, "#95A5A6")
+
+                st.markdown(
+                    f'<div style="display:inline-block;padding:0.4rem 1.2rem;'
+                    f'border-radius:20px;background:{color};color:white;'
+                    f'font-size:1.3rem;font-weight:700;">{pred_category}</div>',
+                    unsafe_allow_html=True,
+                )
+
+                # Rule vs model agreement
+                if rule_label == pred_category:
+                    st.success(f"Rule engine agrees: **{rule_label}**")
+                elif rule_label == "Other":
+                    st.info(f"Rule engine: **Other** (unlabelled) → model predicts **{pred_category}**")
+                else:
+                    st.warning(f"Rule engine: **{rule_label}** | Model: **{pred_category}**")
+
+                st.caption(f"Dosage form: `{dosage_form}` | Salts: `{salt_count}`")
+
+                # Top probabilities
+                proba_dict = {CODE_MAP.get(int(c), str(c)): float(p) for c, p in zip(classes, proba)}
+                top5 = sorted(proba_dict.items(), key=lambda x: -x[1])[:5]
+
+                fig = go.Figure(go.Bar(
+                    x=[t[0] for t in top5],
+                    y=[round(t[1]*100, 1) for t in top5],
+                    marker_color=[CAT_COLORS.get(t[0], "#95A5A6") for t in top5],
+                    text=[f"{round(t[1]*100,1)}%" for t in top5],
+                    textposition="outside",
+                ))
+                fig.update_layout(
+                    title="Top 5 Category Probabilities",
+                    yaxis_title="Probability (%)",
+                    yaxis_range=[0, 115],
+                    height=300,
+                    margin=dict(t=40, b=20, l=10, r=10),
+                    plot_bgcolor="white",
+                    showlegend=False,
+                )
+                st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.markdown("""
+            <div style="text-align:center;color:#aaa;padding:3rem 0;">
+                <div style="font-size:3rem;">🏷️</div>
+                <div>Enter salt composition and click Classify</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.divider()
+    st.markdown("#### Supported Categories")
+    cols = st.columns(4)
+    cats_list = list(CAT_COLORS.items())[:-1] if cat_loaded else []
+    for i, (cat, color) in enumerate(cats_list):
+        cols[i % 4].markdown(
+            f'<span style="background:{color};color:white;padding:2px 8px;'
+            f'border-radius:10px;font-size:0.8rem;">{cat}</span>',
+            unsafe_allow_html=True,
+        )
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TAB 4: Batch Analysis
+# ─────────────────────────────────────────────────────────────────────────────
+with tab4:
     st.markdown("### Batch Prediction from CSV")
     st.markdown("Upload a CSV with columns: `Salt_Composition`, `Quantity`, `Manufacturer`")
 
@@ -238,6 +537,7 @@ with tab2:
                     df_upload["salt_count"] = df_upload["Salt_Composition"].apply(extract_salt_count)
                     df_upload["manufacturer_tier"] = df_upload["Manufacturer"].apply(manufacturer_tier)
                     df_upload["max_dose_mg"] = df_upload["Salt_Composition"].apply(extract_max_dose_mg)
+                    df_upload["is_branded"] = 0
                     df_upload["log_max_dose"] = np.log1p(df_upload["max_dose_mg"])
 
                     X = df_upload[FEATURE_COLS]
@@ -270,9 +570,9 @@ with tab2:
         st.info("Upload a CSV to run batch predictions.")
 
 # ─────────────────────────────────────────────────────────────────────────────
-# TAB 3: Model Insights
+# TAB 5: Model Insights
 # ─────────────────────────────────────────────────────────────────────────────
-with tab3:
+with tab5:
     st.markdown("### Model Card")
 
     col1, col2, col3, col4 = st.columns(4)
