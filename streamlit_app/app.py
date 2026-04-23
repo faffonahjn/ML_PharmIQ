@@ -79,7 +79,7 @@ st.markdown("""
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 💊 PharmIQ")
-    st.caption("Medicine Price Tier Classifier v1.0")
+    st.caption("PharmIQ Platform v2.0")
     st.divider()
 
     st.markdown("#### Model Status")
@@ -105,7 +105,7 @@ with st.sidebar:
     **No MRP fed to model** — formulation-only prediction.
     """)
     st.divider()
-    st.markdown(f"**AUC OvR:** 0.8404 | **Tests:** 45/45 ✓")
+    st.markdown(f"**AUC OvR:** 0.8701 | **Tests:** 98/98 ✓")
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 st.markdown('<p class="main-title">💊 PharmIQ</p>', unsafe_allow_html=True)
@@ -534,7 +534,6 @@ with tab4:
                     df_upload["salt_count"] = df_upload["Salt_Composition"].apply(extract_salt_count)
                     df_upload["manufacturer_tier"] = df_upload["Manufacturer"].apply(manufacturer_tier)
                     df_upload["max_dose_mg"] = df_upload["Salt_Composition"].apply(extract_max_dose_mg)
-                    df_upload["is_branded"] = 0
                     df_upload["log_max_dose"] = np.log1p(df_upload["max_dose_mg"])
 
                     X = df_upload[FEATURE_COLS]
@@ -592,9 +591,9 @@ Pipeline:
     └── TF-IDF (200 terms)  → Salt_Composition
 
   XGBClassifier
-    ├── n_estimators : 300
-    ├── max_depth    : 6
-    ├── learning_rate: 0.05
+    ├── n_estimators : 499
+    ├── max_depth    : 8
+    ├── learning_rate: 0.138
     └── objective    : softmax (4-class)
         """, language="text")
 
@@ -610,7 +609,6 @@ Pipeline:
         | `manufacturer_tier` | ✅ Clean |
         | `salt_count` | ✅ Clean |
         | `max_dose_mg` | ✅ Clean |
-        | `is_branded` | ✅ Clean |
         """)
 
     st.divider()

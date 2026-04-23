@@ -11,6 +11,9 @@ RUN pip install --no-cache-dir -r requirements.txt \
     --timeout 300 \
     --retries 5
 
+ARG CACHE_BUST=unknown
+RUN echo "$CACHE_BUST" > /dev/null
+
 COPY . .
 
 RUN useradd -m appuser && chown -R appuser:appuser /app
