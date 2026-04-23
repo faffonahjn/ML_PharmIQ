@@ -24,7 +24,7 @@ from src.features.engineer import (
 
 # ── Config ────────────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="PharmIQ | Price Tier Classifier",
+    page_title="PharmIQ Platform v2.0",
     page_icon="💊",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -144,8 +144,6 @@ with tab1:
             )
 
         max_dose = st.number_input("Max Dose Strength (mg, 0 if unknown)", min_value=0.0, value=500.0, step=50.0)
-        is_branded = st.radio("Name Type", ["Generic", "Branded"], horizontal=True)
-        is_branded_int = 1 if is_branded == "Branded" else 0
 
         predict_btn = st.button("Predict Price Tier", type="primary", use_container_width=True)
 
@@ -163,7 +161,6 @@ with tab1:
                     "manufacturer_tier": mfr_tier,
                     "dosage_form": dosage_form,
                     "max_dose_mg": max_dose,
-                    "is_branded": is_branded_int,
                     "log_max_dose": log_max_dose,
                     "Salt_Composition": salt_composition,
                 }])
@@ -576,10 +573,10 @@ with tab5:
     st.markdown("### Model Card")
 
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("AUC OvR Macro", "0.8404")
-    col2.metric("Test Accuracy", "60.0%")
+    col1.metric("AUC OvR Macro", "0.8701")
+    col2.metric("Test Accuracy", "64.5%")
     col3.metric("Training Samples", "218,924")
-    col4.metric("Test Suite", "45/45 ✓")
+    col4.metric("Test Suite", "98/98 ✓")
 
     st.divider()
 

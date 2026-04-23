@@ -1,10 +1,10 @@
 project:
   name: PharmIQ
-  version: '1.0'
-  system: price_tier_classifier
+  version: '2.0'
+  system: PharmIQ Platform v2.0
 data:
   raw_path: tata_1mg_Medicine_data.csv
-  processed_path: data/processed/features.parquet
+  processed_path: data/processed/features.csv
 target:
   column: Price_Tier
   classes:
@@ -18,17 +18,21 @@ target:
   - 0.75
 features:
   numeric:
-  - unit_price
   - salt_count
   - pack_size_units
+  - max_dose_mg
+  - log_max_dose
   categorical:
   - dosage_form
   - manufacturer_tier
   text:
   - Salt_Composition
+
 model:
   name: xgboost_price_tier
   path: models/price_tier_classifier_v1.pkl
+  recommender_path: models/recommender_index.pkl
+  category_path: models/category_classifier_v1.pkl
   params:
     n_estimators: 499
     max_depth: 8
@@ -49,4 +53,4 @@ serving:
   port: 8000
   api_version: v1
 thresholds:
-  target_auc_ovr: 0.88
+  target_auc_ovr: 0.85
